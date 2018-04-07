@@ -153,3 +153,20 @@ sds sdscatlen(sds s, const void *t, size_t len)
 
 在sds s后，保存字符串t.
 ```
+## 25. sdscat
+```
+sds sdscat(sds s, const char *t)
+
+调用sdscatlen
+```
+## 26. sdscatsds
+```
+sds sdscatsds(sds s, const sds t)
+
+调用sdscatlen, 参数为sds
+```
+## 27. sdscpylen
+```
+sds sdscpylen(sds s, const char *t, size_t len)
+
+将t复制到s所在的空间，长度也进行拷贝(可能会销毁s所在的内存)
