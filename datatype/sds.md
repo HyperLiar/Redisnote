@@ -246,4 +246,110 @@ sds sdstrim(sds s, const char *cset)
 ## 36. sdsrange
 ```
 void sdsrange(sds s, ssize_t start, ssize_t end)
+
+获取start到end间的sds s.
+使用memmove，移动指定的长度，sdssetlen设置新长度
+```
+## 37. sdstolower
+```
+void sdstolower(sds s)
+
+对sds s的每个字符应用tolower
+```
+## 38. sdstoupper
+```
+void sdstoupper(sds s)
+
+apply toupper() to every character of the sds string 's'
+```
+## 39. sdscmp
+```
+int sdscmp(const sds s1, const sds s2)
+
+use memcmp(s1, s2, minlen)
+当值为0时，比较两者长度；
+否则返回memcmp结果。
+```
+## 40. sdssplitlen
+```
+sds *sdssplitlen(const char *s, ssize_t len, const char *sep, int seplen, int *count)
+
+split s，按sep分割为*count数目的sds数组。
+循环，使用memcmp进行比较。
+```
+## 41. sdsfreesplitres
+```
+void sdsfreesplitres(sds *tokens, int count)
+
+free the result returned by sdssplitlen
+循环执行sdsfree
+```
+## 42. sdscatrepr
+```
+sds sdscatrepr(sds s, const char *p, size_t len)
+
+在sds s后，添加不可打印(isprint())字符的表达形式.
+```
+## 43. is_hex_digit
+```
+int is_hex_digit(char c)
+
+检查是否十六进制字符
+```
+## 44. hex_digit_to_int
+```
+int hex_digit_to_int(char c)
+
+将十六进制字符转换为十进制数字
+```
+## 45. sdssplitargs
+```
+sds *sdssplitargs(const char *line, int *argc)
+
+Split a line into arguments, where every argument can be in the
+following programming-language REPL-alike form:
+
+foo bar "newline are supported\n" and "\xff\x00otherstuff"
+
+*argc代表arguments的数量，返回是一个sds数组。
+```
+## 46. sdsmapchars
+```
+sds sdsmapchars(sds s, const char *from, const char *to, size_t setlen)
+
+sdslen(s) * setlen复杂度，将s中在from字符串内的字符转换为to中对应的字符.
+```
+## 47. sdsjoin
+```
+sds sdsjoin(char **argv, int argc, char *seq)
+
+使用seq连接argv的变量，返回一个sds
+```
+## 48. sdsjoinsds
+```
+sds sdsjoinsds(sds *argv, int argc, const char *sep, size_t seplen)
+
+类似sdsjoin，连接的是sds而非c的字符串
+```
+## 49. sds_malloc
+```
+void *sds_malloc(size_t size)
+
+调用s_malloc(size)
+```
+## 50. sds_realloc
+```
+void *sds_realloc(void *ptr, size_t size)
+
+调用s_realloc(ptr, size)
+```
+## 51. sds_free
+```
+void sds_free(void *ptr)
+
+调用s_free(ptr)
+```
+## 52. sdsTest
+```
+判断是否定义了SDS_TEST_MAIN宏，定义则加入main方法，进行测试
 ```
