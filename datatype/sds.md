@@ -170,3 +170,80 @@ sds sdscatsds(sds s, const sds t)
 sds sdscpylen(sds s, const char *t, size_t len)
 
 将t复制到s所在的空间，长度也进行拷贝(可能会销毁s所在的内存)
+```
+## 28. sdscpy
+```
+sds sdscpy(sds s, const char *t)
+
+类似于sdscpylen, t必须是null-termined（以'\0'结尾）的字符串，
+否则无法用strlen获取其长度。
+```
+## 29. sdsll2str
+```
+int sdsll2str(char *s, long long value)
+
+convert value to string, and store it in s.
+'s' must point to a string with room for at least SDS_LL_SIZE bytes.
+```
+## 30. sdsull2str
+```
+同sdsll2str.
+```
+## 31. sdsfromlonglong
+```
+sds sdsfromlonglong(long long value)
+
+create an sds string from a long long value
+much faster than sdscatprintf(sdsempty(), "%lld\n", value);
+
+use sdsll2str, sdsnewlen
+```
+## 32. sds sdscatprintf
+```
+sds sdscatvprintf(sds s, const char *fmt, va_list ap)
+
+use vsnprintf.
+检查了fmt字符的长度，如果其二倍大于静态大小(1024)，则重新分配
+格式长度为buflen, buflen-2 处设置为'\0'，进行vsnprintf.
+若替换后，buflen-2 处不是'\0', 则buflen *= 2， 再次重新分配，
+循环进行设置'\0',  vsnprintf, 检查的工作直至长度足够。
+```
+## 33. sdscatprintf
+```
+sds sdscatprintf(sds s, const char *fmt, ...)
+
+调用后使用新指针替换:
+s = sdsnew("Sum is : ");
+s = sdscatprintf(s, "%d+%d = %d", a, b, a+b);
+
+格式化的sds字符串:
+s = sdscatprintf(sdsempty(), "... your format ...", args);
+
+使用sdscatvprintf, 返回sdscatvprintf返回的指针.
+```
+## 34. sdscatfmt
+```
+比sdsprintf要快，不依赖于sprintf()家族函数。
+只支持了printf-alike格式的不完整子集(imcompatible subset)
+
+每个循环会依次执行sdsMakeRoomFor, memcpy, sdsinclen
+是string或者sds格式时，需要循环sdsMakeRoomFor；
+是long long, int64_t或者signed int时，需要sdsll2str(buf, num)
+循环sdsMakeRoomFor(s, 1)；
+是unsigned long long或者unsigned int时，需要sdsull2str(buf, num)
+循环sdsMakeRoomFor(s, 1);
+是%%时，只执行sdsinclen(s, 1)
+最后在末尾添加'\0'(null-term)
+```
+## 35. sdstrim
+```
+sds sdstrim(sds s, const char *cset)
+
+移除s两端在cset内的字符串.
+两端依次检查字符是否在cset中，是则移动指针
+最后memmove(s, sp, len)，sdssetlen。
+```
+## 36. sdsrange
+```
+void sdsrange(sds s, ssize_t start, ssize_t end)
+```
