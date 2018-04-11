@@ -338,3 +338,207 @@ dictEntry *dictAddOrFind(dict *d, void *key)
 是dictAddRaw的简化版，总是返回dictEntry，无论key是否已经存在
 key无法添加(返回已存在的key)
 ```
+## 42. dictGenericDelete
+```
+static dictEntry *dictGenericDelete(dict *d, const void *key, int nofree)
+
+搜索，移除一个元素
+d->ht[0],d->ht[1]都为空时返回NULL
+处于rehash时，调用_dictRehashStep(d)
+对ht[0],ht[1]都做如下操作:
+h = dictHashKey(d, key)
+idx = h & d->ht[table].sizemask
+取he = d->ht[table].table[idx]，
+当其为真时，如果key与he->key相等，
+判断he是否有前置节点，有需要调整链表
+否则直接设置d->ht[table].table[idx]为he->next
+nofree为假时，dickFreeKey(d, he) dictFreeVal(d, he)
+
+之后减小used, 返回he
+不相等时，令he = he->next
+
+ht[0]循环结束，如果dict没有处在rehash状态，跳出循环
+```
+## 43. dictDelete
+```
+int dictDelete(dict *ht, const void *key)
+
+用于查找并删除一个元素
+调用dictGenericDelete(ht, key, 0),
+根据其是否为空，返回DICK_ERR或DICK_OK
+```
+## 44. dictUnlink
+```
+dickEntry *dictUnlink(dick *ht, const void *key)
+
+用于删除一个元素，但并不会真正释放key,value和dictEntry
+如果查找到了元素，会返回它。
+调用dictGenericDelete(ht, key, 1)
+
+这个函数是为了真正移除一个元素时，不需要进行多次的查找：
+
+entry = dictFind(...);
+dictDelete(dictionary, entry);--> the second lookup
+
+entry = dictUnlink(dictionary, entry);
+dictFreeUnlinkedEntry(entry);--> does not need to lookup again
+```
+## 45. dictFreeUnlinkedEntry
+```
+void dictFreeUnlinkedEntry(dict *d, dictEntry *he)
+
+释放一个已经被unlink的dictEntry:
+dictFreekey(d, he);
+dictFreeVal(d, he);
+zfree(he);
+```
+## 46. _dictClear
+```
+int _dictClear(dict *d, dicthe *ht, void(callback)(void *))
+
+清空并释放完整的字典结构
+循环条件i < ht->size & ht->used > 0
+在i & 65535 == 0时，调用callback(d->privdata)
+he = ht->table[i] == 0时继续循环
+否则将he从链表中移除并释放空间，he = nextHe
+最终释放ht->table, _dictReset(ht)--> 重新初始化table
+返回DICT_OK
+```
+## 47. dictRelease
+```
+void dictRelease(dict *d)
+
+清空并释放整个哈希表
+_dictClear(d, &d->ht[0], NULL);
+_dictClear(d, &d->ht[1], NULL);
+zfree(d)
+```
+## 48. dictFind
+```
+dictEntry *dictFind(dict *d, const void *key)
+
+在dict结构中，找到给定的key对应的元素。
+d->ht[0], d->ht[1]都会进行查找
+```
+## 49. dictFetchValue
+```
+void *dictFetchValue(dict *d, const void *key)
+
+返回dict中，对应key对应的value
+调用dictFind, 获取dictEntry后调用dictGetVal(he)
+```
+## 50. dictFingerprint
+```
+long long dictFingerprint(dict *d)
+
+fingerprint是一个64bit的数字，代表dict在某个时间的状态
+只是几个属性的异或值
+初始化一个不安全的迭代器时生成fingerprint, 释放时校验。
+用fingerprint保证不会有不安全的迭代器对dict进行迭代。
+```
+## 51. dictGetIterator
+```
+dictIterator *dictGetIterator(dict *d)
+
+返回一个在d上的空iterator
+```
+## 52. dictGetSafeIterator
+```
+dictIterator *dictGetSafeIterator(dict *d)
+
+调用dictGetIterator，使iterator->safe = 1
+```
+## 53. dictNext
+```
+dictEntry *dictNext(dictIterator *iter)
+
+返回iter的nextEntry，注意在找到非空的entry时，要在
+迭代器中保存这个entry的next，因为可能当前的entry会被释放掉
+
+iter->entry为空
+第一次iter开始时
+如果iter是安全的，那么每次增长iter->d->iterators的值，
+否则存储iter->fingerprint
+
+每次增加iter->index的值，当index>ht->size时
+如果正在hash，且iter ht[0]，则设置为iter ht[1]
+否则break跳出循环
+置iter->entrt = ht->table[iter->index]
+
+否则，iter->entry = iter->nextEntry
+
+如果iter->entry不为空，返回。
+```
+## 54. dictReleaseIterator
+```
+void dictReleaseIterator(dictIterator *iter)
+
+如果iter->index 不为-1，或iter->table != 0
+安全时，减小iter->d->iterators
+不安全断言fingerprint
+释放iter
+```
+## 55. dictGetRandomKey
+```
+dictEntry *dictGetRandomKey(dict *d)
+
+返回一个随机的entry
+处于rehash中，只从ht[0]中选取
+否则在ht[0], ht[1]中随机选择一个桶，
+之后循环拿到桶中链表的数量，随机选择。
+```
+## 56. dictGetSomeKeys
+```
+unsigned int dictGetSomeKeys(dict *d, dictEntry **des, unsigned int count)
+
+返回一组entry，保存在dsc中
+```
+## 57. rev
+```
+statis unsigned long rev(unsigned long v)
+
+reverse bits.
+```
+## 58. dictScan
+```
+unsigned long dictScan(dict *d, unsigned long v,
+                       dictScanFunction *fn,
+                       dictScanBucketFUnction *bucketfn,
+                       void *privdata)
+
+```
+## 59. _dictExpandIfNeeded
+```
+static int _dictExpandIfNeeded(dict *d)
+
+
+```
+## 60. _dictNextPower
+```
+static unsigned long _dictNextPower(unsigned long size)
+
+```
+## 61. _dictKeyIndex
+```
+static long _dictKeyIndex(dict *d, const void *key, uint64_t hash, dictEntry **existring)
+
+```
+## 62. dictEmpty
+```
+void dictEmpty(dict *d, void(callback)(void*))
+
+```
+## 63. dictEnableResize
+```
+void dictEnableResize(void)
+
+```
+## 64. dictDisableResize
+```
+void dictDisableResize(void)
+
+```
+## 65. dictGetHash
+```
+uint64_t dictGetHash(dict *d, const void *key)
+```
