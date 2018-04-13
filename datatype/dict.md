@@ -506,6 +506,44 @@ unsigned long dictScan(dict *d, unsigned long v,
                        dictScanBucketFUnction *bucketfn,
                        void *privdata)
 
+用于扫描整个dict，每完成一次迭代，返回一个cursor，
+下次调用需要使用cursor,返回0时表示迭代结束
+
+保证会循环到所有的元素，但是有些元素可能被多次返回
+每个返回的元素,调用fn(privdata, de)
+
+从较高的bit位开始迭代，因为ht可能在迭代期间被resize.
+
+如果hash的size变大了，
+如果变小，
+而rehash时有两个表，故每次都是从较小的table开始迭代，
+之后测试在更大的表中是否有当前的cursor的任何拓展
+
+优点在于: iterator是无状态的，且不需要任何额外的内存
+缺点在于：可能多次返回同一个元素
+          如果要返回多个元素，可能每次都需要访问桶中
+相连的所有元素和所有的expansions，这是为了保证rehashing时不会miss keys.
+
+
+如果没处于rehash，直接v & mask, 取对应的de，调用fn.
+--> 迭代完de桶内的所有元素
+否则的话，先迭代较小的ht，
+同样 v & mask0, 取de调用fn
+
+对v, mask1做相同操作，
+
+increment bits not covered by the smaller mask.
+v = (((v | m0) + 1) & ~m0) | ( v & m0);
+continue while bits covered by mask diff is non-zero
+while ( v & (mo ^ m1))
+
+Set unmasked bits so incrementing the reversed cursor
+operates on the masked bits of the smaller table
+v |= ~m0;
+
+v = rev(v); v++; v = rev(v);
+
+返回v.
 ```
 ## 59. _dictExpandIfNeeded
 ```
@@ -541,4 +579,50 @@ void dictDisableResize(void)
 ## 65. dictGetHash
 ```
 uint64_t dictGetHash(dict *d, const void *key)
+```
+## 66. dictFindEntryRefByPtrAndHash
+```
+dictEntry **dictFindEntryRefByPtrAndHash(dict *d, const void *oldptr, uint64_t hash)
+```
+/* --------------- debugging ----------------*/
+## 67. _dictGetStatsHt
+```
+size_t _dictGetStatsHt(char *buf, size_t bufsize, dictht *ht, int tableid)
+```
+## 68. dictGetStats
+```
+void dictGetStats(char *buf, size_t bufsize, dict *d_
+```
+/* --------------- benchmark ---------------- */
+## 69. hashCallback
+```
+uint64_t hashCallback(const void *key)
+```
+## 70. compareCallback
+```
+int compareCallback(void *privdata, const void *key1, const void *key2)
+```
+## 71. freeCallback
+```
+void freeCallback(void *privdata, void *val)
+```
+## 72. BenchmarkDictType
+```
+dictType BenchmarkDictType = {
+    hashCallback,
+    NULL,
+    compareCallback,
+    freeCallback,
+    NULL
+```
+## 73. start_benchmark
+```
+#define start_benchmark() start = timeInMilliseconds()
+```
+## 74. end_benchmark
+```
+#define end_benchmark(msg) do { \
+    elapsed = timeInMilliseconds()-start; \
+    printf(msg ": %ld items in %lld ms\n", count, elapsed); \
+} while(0)
 ```
