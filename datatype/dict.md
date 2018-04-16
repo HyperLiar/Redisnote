@@ -544,45 +544,81 @@ v |= ~m0;
 v = rev(v); v++; v = rev(v);
 
 返回v.
+(TODO:暂时没看懂)
 ```
 ## 59. _dictExpandIfNeeded
 ```
 static int _dictExpandIfNeeded(dict *d)
 
-
+已经处于rehash,返回DICT_OK
+如果ht[0]为空，返回dictExpand(d, DICT_HT_INITIAL_SIZE)
+如果ht[0].used多于size，且 (全局配置可以resize或
+used/size比例大于dict_force_resize_ratio)
+返回dictExpand(d, d->ht[0].used*2)
+返回DICT_OK
 ```
 ## 60. _dictNextPower
 ```
 static unsigned long _dictNextPower(unsigned long size)
 
+计算hash的下一个容量(总是2的幂)
+如果size >= LONG_MAX，返回LONG_MAX + 1LU
+i = DICT_HT_INITIAL_SIZE，每次循环乘2
+当i > size时，返回i
 ```
 ## 61. _dictKeyIndex
 ```
 static long _dictKeyIndex(dict *d, const void *key, uint64_t hash, dictEntry **existring)
 
+返回空闲位置是否被一个给定key代表的hash entry填充
+_dictExpandIfNeeded(d) == DICT_ERR，返回-1
+对tab循环，找到hash对应的idx, 返回对应位置的he
+如果对应he->key和给定的key相等，返回-1，一直循环到he->next为空
+如果处在rehash状态，会继续循环d->ht[1]
+也就是返回idx = hash & d->ht[1].sizemask
+抛弃ht[0]的sizemask
 ```
 ## 62. dictEmpty
 ```
 void dictEmpty(dict *d, void(callback)(void*))
 
+执行_dictClear清空ht[0]和ht[1]
+置rehashidx = -1
+iterators = 0
 ```
 ## 63. dictEnableResize
 ```
 void dictEnableResize(void)
 
+设置dict_can_resize = 1
 ```
 ## 64. dictDisableResize
+void dictDisableResize(void)
 ```
 void dictDisableResize(void)
 
+设置dict_can_resize = 0
 ```
 ## 65. dictGetHash
 ```
 uint64_t dictGetHash(dict *d, const void *key)
+
+return dictHashKey)d, key)
 ```
 ## 66. dictFindEntryRefByPtrAndHash
 ```
 dictEntry **dictFindEntryRefByPtrAndHash(dict *d, const void *oldptr, uint64_t hash)
+
+靠指针和预计算的hash值找到dictEntry的引用
+不执行任何key/string comparision
+如果对应的引用是空返回NULL
+
+dict为空，返回NULL
+对ht[0] ht[1]，heref为对应位置的引用，
+如果oldptr == he->key，返回heref
+
+否则heref = &he->next，继续比较到NULL为止
+如果未处在rehash状态，不会在ht[1]查找
 ```
 /* --------------- debugging ----------------*/
 ## 67. _dictGetStatsHt
