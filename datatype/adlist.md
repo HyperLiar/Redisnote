@@ -168,6 +168,7 @@ void listRewind(list *list, listIter *li)
 将li设置为 list的头节点开始遍历
 ```
 ## 26. listRewindTail
+```
 void listRewindTail(list *list, listIter *li)
 
 将li设置为 list的尾节点开始遍历
