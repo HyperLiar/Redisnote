@@ -102,4 +102,217 @@ struct hllhdr {
 ```
 ## 7. Low level bit macros 概述
 ```
+我们需要在8 bit types内设置6 bit的counter.
+使用宏来保障运行速度。
+```
+## 8. HLL_DENSE_GET_REGISTER
+```
+#define HLL_DENSE_GET_REGISTER(target, p, regnum) do { \
+    uint8_t *_p = (uint8_t*) p; \
+    unsigned long _byte = regnum*HLL_BITS/8; \
+    unsigned long _fb = regnum*HLL_BITS&7; \
+    unsigned long _fb8 = 8 - _fb; \
+    unsigned long b0 = _p[_byte]; \
+    unsigned long b1 = _p[_byte+1]; \
+    target = ((b0 >> _fb) | (b1 << _fb8)) & HLL_REGISTER_MAX; \
+} while(0)
+
+将register regnum位置的值存储到变量target中
+p是unsigned byte的数组
+```
+## 9. HLL_DENSE_SET_REGISTER
+```
+#define HLL_DENSE_SET_REGISTER(p, regnum, val) do { \
+    uint8_t *_p = (uint8_t*) p; \
+    unsigned long _byte = regnum*HLL_BITS/8; \
+    unsigned long _fb = regnum*HLL_BITS&7; \
+    unsigned long _fb8 = 8 - _fb; \
+    unsigned long _v = val;
+    _p[_byte] &= ~(HLL_REGISTER_MAX << _fb); \
+    _p[_byte] |= _v << _fb; \
+    _p[_byte+1] &= ~(HLL_REGISTER_MAX >> _fb8); \
+    _p[_byte+1] |= _v >> _fb8; \
+} while (0) 
+设置register在regnum位置的值为val
+```
+## 10. macros to access the sparse representation
+```
+#define HLL_SPARSE_XZERO_BIT 0x40 /* 01xxxxxx */
+#define HLL_SPARSE_VAL_BIT 0x80 /* 1vvvvvxx */
+#define HLL_SPARSE_IS_ZERO(p) (((*(p)) & 0xc0 ) == 0) /* 00xxxxxx */
+#define HLL_SPARSE_IS_XZERO(p) (((*p)) & 0xc0) == HLL_SPARSE_XZERO_BIT)
+#define HLL_SPARSE_IS_VAL(p) ((*(p)) & HLL_SPARSE_VAL_BIT)
+#define HLL_SPARSE_ZERO_LEN(p) (((*(p) & 0x3f)+1)
+#define HLL_SPARSE_XZERO_LEN(p) (((((*(p)) & 0x3f) << 8) | (*((p)+1)))+1)
+#define HLL_SPARSE_VAL_VALUE(p) ((((*(p)) >> 2) & 0x1f)+1)
+#define HLL_SPARSE_VAL_LEN(p) (((*(p)) & 0x3)+1)
+#define HLL_SPARSE_VAL_MAX_VALUE 32
+#define HLL_SPARSE_VAL_MAX_LEN 4
+#define HLL_SPARSE_ZERO_MAX_LEN 64
+#define HLL_SPARSE_XZERO_MAX_LEN 16384
+#define HLL_SPARSE_VAL_SET(p, val, len) do { \
+    *(p) = (((val)-1)<<2|((len)-1)|HLL_SPARSE_VAL_BIT; \
+} while(0)
+#define HLL_SPARSE_ZERO_SET(p,len) do { \
+    *(p) = (len)-1; \
+} while(0)
+#define HLL_SPARSE_XZERO_SET(p, len) do { \
+    int _l = (len)-1; \
+    *(p) = (_l>>8) | HLL_SPARSE_XZERO_BIT; \
+    *((p)+1) = (_l&0xff); \
+} while(0)
+#define HLL_ALPHA_INF 0.721347520444481703680
+/* 0.5 / ln2 */
+```
+## 11. MurmurHash64A
+```
+uint64_t MurmurHash64A (const void *key, int len, unsigned int seed)
+hash function is murmurhash2, 64 bit version
+做了一些修改，保证big little endian archs会得到相同的结果
+```
+## 12. hllPatLen
+```
+int hllPatLen(unsigned char *ele, size_t elesize, long *regp)
+
+给出要添加到hyperloglog的string，返回000...1这个模式在ele的hash
+中的长度,reg被设置为这个元素出来register中的index
+index = hash & HLL_P_MASK; 存储,
+hash >> = HLL_P; 移除index部分
+hash |= ((uint64_t)1<<HLL_Q) -> 保证count <= Q-1
+
+就是为了数出最后的1所在位置
+```
+## 13. hllDenseSet
+```
+int hllDenseSet(uint_8 *registers, long index, uint8_t count)
+HLL_DENSE_GET_REGISTER得到oldcount
+如果count > oldcount
+HLL_DENSE_SET_REGISTER
+```
+## 14. hllDenseAdd
+```
+int hllDenseAdd(uint8_t *registers, unsigned char *ele, size_t elesize)
+本质上没有做任何添加，如果有必要会增加元素所属的subset
+内,max 0 pattern counter.
+只是hllDenseSet的封装
+```
+## 15. hllDenseRegHisto
+```
+void hllDenseRegHisto(uint8_t *registers, int* reghisto)
+计算dense representation的register histogram
+
+没有使用循环,使用写死的16384(register)和6(bits)
+```
+## 16. hllSparseToDense
+```
+int hllSparseToDense(robj *o)
+
+```
+## 17. hllSparseSet
+```
+int hllSparseSet(robj *o, long index, uint8_t count)
+
+```
+## 18. hllSparseAdd
+```
+int hllSparseAdd(robj *o, unsigned char *ele, size_t elesize)
+类似于hllDenseAdd,只是hllSparseSet的封装
+```
+## 19. hllSparseRegHisto
+```
+void hllSparseRegHisto(uint8_t *sparse, int sparselen, int* invalid, int *reghisto)
+
+计算register histogram
+```
+## 20. hllRawRegHisto
+```
+void hllRawRegHisto(uint8_t *registers, int* reghisto)
+
+为uint8_t的数据类型拓展register histogram计算
+只用来为批量key的PFCOUNT做提速用
+
+word为uint64_t的registers, 遍历word(0~HLL_REGISTERS/8)
+如果*word = 0, reghisto[0]+=8
+否则,bytes = (uint8_t*)word
+reghisto[bytes[0]]++; 对bytes每一位对应的位置,reghisto增加
+```
+## 21. hllSigma
+```
+double hllSigma(double x)
+参照"New cardinality estimation algorithms for HyperLogLog sketches"
+```
+## 22. hllTau
+```
+double hllTau(double x)
+参照"New cardinality estimation algorithms for HyperLogLog sketches"
+```
+## 23. hllCount
+```
+uint64_t hllCount(struct hllhdr *hdr, int *invalid)
+
+返回估算的基数值,hdr指向SDS的开始位置
+根据hdr->encoding 调用hllDenseRegHisto,hllSparseRegHisto,hllRawReghisto
+参照"New cardinality estimation algorithms for HyperLogLog sketches"
+计算最终的值
+```
+## 24. hllAdd
+```
+int hllAdd(robj *o, unsigned char *ele, size_t elesize)
+
+按照hllencoding 调用hllDenseAdd或者hlSparseAdd,否则返回-1
+struct hllhdr *hdr = o->ptr;
+```
+## 25. hllMerge
+```
+int hllMerge(uint8_t *max, robj *hll)
+
+max 指向带有array of uint8_t HLL_REGISTERS registers.
+hll 计算MAX(registers[i],hll[i]
+
+如果hll是sparse且不可用会返回C_ERR,否则总是成功
+
+struct hllhdr *hdr = hll->prt;
+hdr->encoding为HLL_DENSE的场合
+循环 i < HLL_REGISTERS 执行HLL_DENSE_GET_REGISTER(val, hdr->registers, i)
+val > max[i]则max[i] = val
+
+其他情况,*p = hll->ptr, p += HLL_HDR_SIZE
+*end = p + sdslen(hll->ptr)
+
+在p<end的情况下, 判断HLL_SPARSE_IS_ZEOR(p) HLL_SPARSE_IS_XZERO(p)
+根据结果不同,p++或p+=2, i记载HLL_SPARSE_ZERO_LEN(p)的和
+都不是的情况,p++,i++,
+i != HLL_REGISTERS,认为hll不可用，返回C_ERR
+```
+## 26. createHllObject
+```
+robj *createHllObject(void)
+
+总是使用sparse encoding创建hll,如果有需要会升级为dense
+```
+## 27. isHllObjectOrReply
+```
+int isHllObjectOrReply(client *c, robj *o)
+
+检查object是否是一个具有可用的hll representation的String
+```
+## 28. pfaddcommand
+```
+void pfaddCommand(client *c)
+
+PFADD var ele ele ele ... ele => :0 or :1
+
+循环对参数执行hlladd
+```
+## 29. pfcountCommand
+```
+void pfcountCommand(client *c)
+
+PFCOUNT var -> approximated cardinality of set
+```
+## 30. pfmergeCommand
+```
+void pfmergeCommand(client *c)
+
+PFMERGE dest src1 src2 src3 ... srcN => OK
 ```
