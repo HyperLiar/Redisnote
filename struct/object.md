@@ -369,4 +369,12 @@ OBJECT <refcount|encoding|idletime|freq> <key>
 如果只有两个参数,且第二个为help返回帮助信息
 refcount时o = objectCommandLookupOrReply(c, c->argv[2], shared.nullbulk)
 
+addReply 返回o的部分信息
+```
+## 65 memoryCommand
+```
+void memoryCommand(client *c)
+
+MEMORY usage <key>
+等等其他命令和输出..
 ```
