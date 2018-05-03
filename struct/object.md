@@ -275,7 +275,7 @@ getDoubleFromObject失败时,msg不为空则addReplyError(c, (char*)msg)
 ```
 int getLongDoubleFromObject(robj *o, long double *target)
 
-类似于getLongDoubleFromObject
+类似于getDoubleFromObject
 value = strtold(o->ptr, &eptr)
 value = (long)o->ptr
 ```
