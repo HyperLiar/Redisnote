@@ -220,5 +220,45 @@ unsigned long zslDeleteRangeByLex(zskiplist *zsl, zlexrangespec *range, dict *di
 unsigned long zslDeleteRangeByRank(zskiplist *zsl, unsigned int start
 unsigned int end, dict *dict)
 
-删除rank在start,end间的所有元素
+删除rank在start,end间的所有元素, rank从1开始
+老套路找到start的位置,通过traversed字段记录span值(注意层数是从上往下)
+while循环, zslDeleteNode, dictDelete, zslFreeNode连击
+```
+## 22. zslGetRank
+```
+unsigned long zslGetRank(zskiplist *zsl, double score, sds ele)
+
+按score和ele查找元素,返回rank,rank从1开始
+老套路, while内移动指针,记录rank,
+注意x可能是zsl->header,所以需要检查obj是否非空
+没有找到对应元素的场合,返回0
+```
+## 23. zslGetElementByRank
+```
+zskiplistNode* zslGetElementByRank(zskiplist *zsl, unsigned long rank)
+
+按rank找到一个node, rank是1-based
+```
+## 24. zslParseRange
+```
+static int zslParseRange(robj *min, robj *max, zrangespec *spec)
+
+populate the rangespec according to the objects min and max
+如果min/max为'('的形式,表示< / >，否则<= / >=
+```
+## 25. zslParseLexRangeItem
+```
+int zslParseLexRangeItem(robj *item, sds *dest, int *ex)
+
+(foo 为 foo 开区间, [foo 为 foo 闭区间,
+- 为可能的最小串, + 为可能的最大串
+```
+## 26. zslFreeLexRange
+```
+void zslFreeLexRange(zlexrangespec *spec)
+
+free spec
+```
+## 27. zslParseLexRange
+```
 ```
