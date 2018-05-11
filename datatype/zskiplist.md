@@ -261,4 +261,48 @@ free spec
 ```
 ## 27. zslParseLexRange
 ```
+int zslParseLexRange(robj *min, robj *max, zlexrangespec *spec)
+
+注意range必须以( [开头,故这个range不适用于int encoded object
+```
+## 28. sdscmplex
+```
+int sdscmplex(sds a, sds b)
+
+对sdscmp封装, 比较a,b和-inf, +inf是否相等
+a == b 返回0
+a == -inf b == +inf 返回-1
+a == +inf b == -inf 返回 1
+其他情况返回sdscmp
+```
+## 29. zslLexValueGteMin
+```
+int zslLexValueGteMin(sds value, zlexrangespec *spec)
+
+spec->minex存在 返回 sdscmplex(value, spec->min) > 0
+否则返回 sdscmplex(value, spec->min) >= 0
+```
+## 30. zslLexValueLteMax
+```
+int zslLexValueLteMax(sds value, zlexrangespec *spec)
+
+类似
+```
+## 31. zslIsInLexRange
+```
+int zslIsInLexRange(zskiplist *zsl, zlexrangespec *range)
+
+判断zset内是否有部分在lex range范围内
+```
+## 32. zslFirstInLexRange
+```
+zskiplistNode *zslFirstInLexRange(zskiplist *zsl, zlexrangespec *range)
+
+找到特定lex range内的第一个node
+老套路, zslLexValueGteMin, 然后判断x->level[0].forward是否为空
+检查zslLexValueLteMax 确定在范围内
+```
+## 33. zslLastInLexRange
+```
+zskiplistNode *zslLastInLexRange(zskiplist *zsl, zlexrangespec *range)
 ```
