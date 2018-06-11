@@ -305,4 +305,5 @@ zskiplistNode *zslFirstInLexRange(zskiplist *zsl, zlexrangespec *range)
 ## 33. zslLastInLexRange
 ```
 zskiplistNode *zslLastInLexRange(zskiplist *zsl, zlexrangespec *range)
+同zslFirstInLexRange
 ```
