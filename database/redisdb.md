@@ -422,4 +422,188 @@ int dbSwapDatabases(int ids, int id2)
 希望客户端保持他们在原来的db中
 
 然后处理blocked keys 使用scanDatabaseFirReadyLists
+
+交换两个库，可能客户端等待的key列表已经不处在block状态了
+然而出于效率的考虑，只有在dbAdd的时候才会做这个检查
+故而我们需要rescan客户端阻塞的列表
+```
+## 45. swapdbCommand
+```
+void swapdbCommand(client *c)
+
+检查参数合法，调用dbSwapDatabases
+```
+## 46. removeExpire
+```
+int removeExpire(redisDb *db, robj *key)
+
+只有在main dict存在对应entry的expire才可以被move
+否则这个key永远不会被free
+dictFind(db->dict, key->ptr)
+return dictDelete(db->expires, key->ptr) == DICT_OK
+```
+## 47. setExpire
+```
+void setExpire(client *c, redisDb *db, robj *key, long long when)
+
+对特定的key设置expire when代表unix的绝对毫秒时间 when之后不可用
+
+复用main dict的sds dictAddOrFind(db->expires,dictGetKey(kde))
+dictSetSignedIntegerVal(de, when)设置过期时间
+rememberSlaveKeyWithExpire(db, key)
+```
+## 48. getExpire
+```
+long long getExpire(redisDb *db, robj *key)
+
+返回特殊key的过期时间 dictSize(db->expires) == 0 || dictFind*db->expires, key->ptr) == NULL 返回-1
+还需要dictFind(db->dict, key->ptr) 保证key也在主dict内
+dictGetSignedIntegerVal(de)
+```
+## 49. propagateExpire
+```
+void propagateExpire(redisDb *db, robj *key, int lazy)
+
+把expire传播到slave和AOF文件内
+当master内的key到期时，DEL操作会发送给所有的slave和AOF文件
+这种方式key的过期时间是在一处中心化的
+
+server.aof_state != AOF_OFF feedAppendOnlyFile(server.delCommand, db->id, argv,2)
+replicationFeedSlaves(server.slaves, db->id, argv, 2)
+```
+## 50. expireIfNeeded
+```
+int expireIfNeeded(redisDb *db, robj *key)
+
+主要被lookupKey族方法调用
+方法的行为取决于实例的角色 slave角色不会过期key
+他们只会等待著哭传递的del信息
+但从库需要有一个连贯的返回 故而从库执行的read命令会表现的好像key已经过期
+即使从库上还未过期，因为主库propagate DEL还没完成
+在主库查找一个过期key的副作用是这样的key会从db中被驱逐
+这个行为同样会传播给AOF/replication stream
+key 可用返回0 过期返回1
+
+过期时间when = getExpire(db, key)
+server.loading时，不过期任何key，loading完成后再执行expire
+如果处于lua调用，假设时间锁定在脚本开始执行的时间server.lua_time_start
+
+slave，返回 now > when
+否则now < when 返回0
+删除过期key
+```
+## 51. getKeysUsingCommandTable
+```
+int *getKeysUsingCommandTable(struct redisCommand *cmd, robj **argv, int argc, int *numkeys)
+
+从命令中获取key 
+j = cmd->firstkey, j<= last, j += cmd->keystep
+last = cmd->lastKey
+last < 0 时 last = argc + last
+
+返回keys, 个数存在*numkeys内
+```
+## 52. getKeysFromCommand
+```
+int *getKeysFromCommand(struct redisCommand *cmd, robj **argv, int argc, int *nuimkeys)
+
+返回commnd中所有的keys
+会返回array内key参数的位置
+cmd->flags & CMD_MODULE_GETKEYS
+moduleGetCommandKeysViaAPI(cmd, argv, argc, numkeys)
+cmd->getkes_proc
+cmd->getkeys_proc(cmd, argv, argc, numkeys)
+否则
+getKeysUsingCommandTable(cmd, argv, argc, numkeys)
+```
+## 53. getKeysFreeResult
+```
+void getKeysFreeResult(int *result)
+
+释放getKeysFromCommand获取到的result
+zfree(result)
+```
+## 54. zunionInterGetKeys
+```
+int *zunionInterGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys)
+
+extract keys from zunionstroe/zinterstore
+```
+## 55. evalGetKeys
+```
+int *evalGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys)
+
+extract keys from EVAL/EVALSHA
+```
+## 56. sortGetKeys
+```
+int *sortGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys)
+
+extract kesy from the sort command
+```
+## 57. migrateGetKeys
+```
+int *migrateGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys)
+```
+## 58. georadiusGetKeys
+```
+int *georadiusGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys)
+```
+## 59. xreadGetKeys
+```
+int *xreadGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys)
+```
+## 60. slotToKeyUpdateKey
+```
+void slotToKeyUpdateKey(robj *key, int add)
+
+used by Redis Cluster 为了快速找到属于特定的hash slot的keys
+适用于rehash the cluster和其他我们需要了解是否有给定的hash slot内的key的场景
+
+hashslot = keyHashSlot(key->ptr, sdslen(key->ptr))
+add == 1 则 raxInsert/raxRemove
+server.cluster->slots_to_keys, indexed, keylen+2
+```
+## 61. slotToKeyAdd
+```
+void slotToKeyAdd(robj *key)
+slotToKeyUpdateKey(key, 1)
+```
+## 62. slotToKeyDel
+```
+void slotToKeyDel(robj *key)
+slotToKeyUpdateKey(key, 0)
+```
+## 63. slotToKeyFlush
+```
+raxFree(server,cluster->slots_to_keys)
+server.cluster->slots_to_keys = raxNew()
+memset
+```
+## 64. getKeysInSlot
+```
+unsigned int getKeysInSlot(unsigned int hashslot, robj **keys, unsigned int count)
+
+获取slot内的keys
+调用方去减少key name的引用计数
+rax 循环迭代，在keys中保存新建的stringObject
+返回keys内的元素个数
+```
+## 65. delKeysInSlot
+```
+unsigned int delKeysInSlot(unsigned int hashslot)
+
+删除特定的hash slot内的所有keys 返回被删除item个数
+raxStart(&iter, server,cluster->slots_to_keys)
+while (server.cluster->slots_keys_count[hashslot])
+raxSeek, raxNext, *key = createStringObject,
+dbDelete(&server.db[0], key)  decrRefCount(key)
+
+raxStop(&iter)
+```
+## 66. countKeysInSlot
+```
+unsigned int countKeysInSlot(unsigned int hashslot)
+return server.cluster->slot_keys_count[hashslot]
+返回对应hashslot内的key总数
 ```
